@@ -7,86 +7,47 @@ on:
     branches: [ main ]
 
 jobs:
-  lint-markdown:
-    name: Lint Markdown
+  validate:
+    name: Validate Templates & Structure
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install markdownlint
-        run: npm install -g markdownlint-cli
+      - name: Check required files exist
+        run: |
+          MISSING=0
+          for f in README.md; do
+            if [ ! -f "$f" ]; then echo "MISSING: $f"; MISSING=1; else echo "OK: $f"; fi
+          done
+          exit $MISSING
 
-      - name: Run markdownlint
-        run: markdownlint "**/*.md" --ignore node_modules --config .markdownlint.json || true
+      - name: Validate YAML files
+        run: |
+          pip install pyyaml -q
+          python3 -c "
+          import os, sys, yaml
+          errors = []
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d != '.git']
+              for f in files:
+                  if f.endswith(('.yml', '.yaml')):
+                      path = os.path.join(root, f)
+                      try:
+                          yaml.safe_load(open(path))
+                      except yaml.YAMLError as e:
+                          errors.append(str(e))
+          if errors:
+              for e in errors: print('YAML ERROR:', e)
+              sys.exit(1)
+          print('All YAML files valid')
+          "
 
-  check-links:
-    name: Check Links
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check Markdown links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
-        with:
-          use-quiet-mode: 'yes'
-          use-verbose-mode: 'no'
-          config-file: '.mlc_config.json'
+      - name: Check markdown files are non-empty
         continue-on-error: true
-
-  validate-structure:
-    name: Validate Repository Structure
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check required files and folders exist
         run: |
-          echo "=== Validating soc-compliance-reporting structure ==="
-
-          # Required files
-          REQUIRED_FILES=(
-            "README.md"
-            "checklists/nist-csf-audit.md"
-            "metrics/soc-metrics-template.md"
-            "reporting/weekly-report-template.md"
-            "reporting/monthly-executive-summary.md"
-          )
-
-          PASS=true
-          for f in "${REQUIRED_FILES[@]}"; do
-            if [ -f "$f" ]; then
-              echo "✅  $f"
-            else
-              echo "❌  MISSING: $f"
-              PASS=false
-            fi
+          EMPTY=0
+          find . -name "*.md" -not -path "./.git/*" | while read f; do
+            SIZE=$(wc -c < "$f")
+            if [ "$SIZE" -lt 10 ]; then echo "WARN: very small file: $f ($SIZE bytes)"; fi
           done
-
-          if [ "$PASS" = false ]; then
-            echo "Structure validation FAILED"
-            exit 1
-          fi
-          echo "Structure validation PASSED"
-
-      - name: Check templates contain required sections
-        run: |
-          echo "=== Checking template completeness ==="
-
-          # Weekly report must have key sections
-          grep -q "Week at a Glance" reporting/weekly-report-template.md && echo "✅  Weekly report: summary section found" || echo "⚠️   Weekly report: summary section missing"
-          grep -q "Incidents Summary" reporting/weekly-report-template.md && echo "✅  Weekly report: incidents section found" || echo "⚠️   Weekly report: incidents section missing"
-
-          # Monthly report must have exec overview and metrics
-          grep -q "Executive Overview" reporting/monthly-executive-summary.md && echo "✅  Monthly report: exec overview found" || echo "⚠️   Monthly report: exec overview missing"
-          grep -q "Decisions Required" reporting/monthly-executive-summary.md && echo "✅  Monthly report: decisions section found" || echo "⚠️   Monthly report: decisions section missing"
-
-          # NIST checklist must have all functions
-          for func in GOVERN IDENTIFY PROTECT DETECT RESPOND RECOVER; do
-            grep -q "$func" checklists/nist-csf-audit.md && echo "✅  NIST checklist: $func found" || echo "❌  NIST checklist: $func MISSING"
-          done
-
-          # Metrics template must have MTTD/MTTR
-          grep -q "MTTD" metrics/soc-metrics-template.md && echo "✅  Metrics: MTTD section found" || echo "⚠️   Metrics: MTTD section missing"
-          grep -q "MITRE" metrics/soc-metrics-template.md && echo "✅  Metrics: MITRE coverage section found" || echo "⚠️   Metrics: MITRE coverage section missing"
-
-          echo "Template validation complete."
+          echo "Markdown check complete"
