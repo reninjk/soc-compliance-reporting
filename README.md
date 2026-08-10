@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Last Commit](https://img.shields.io/github/last-commit/reninjk/soc-compliance-reporting)](https://github.com/reninjk/soc-compliance-reporting/commits/main) [![Issues](https://img.shields.io/github/issues/reninjk/soc-compliance-reporting)](https://github.com/reninjk/soc-compliance-reporting/issues)
+
 # SOC Compliance & Reporting Hub
 
 > Centralised repository for compliance frameworks, audit checklists, SOC metrics, and executive reporting templates.
